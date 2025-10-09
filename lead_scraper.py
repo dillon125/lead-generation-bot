@@ -147,37 +147,55 @@ def main():
     # Initialize lead generator
     generator = LeadGenerator(API_KEY)
     
-    # Define search parameters
+    # High-value, high-earning local + national business types
     queries = [
-        'barber shop',
-        'hair salon',
-        'dental office',
-        'dentist',
-        'real estate agent',
-        'insurance agent',
-        'tax preparation',
-        'accounting services',
-        'cleaning service',
-        'landscaping service',
-        'plumber',
-        'electrician',
-        'hvac contractor',
-        'roofing contractor',
-        'auto repair shop',
-        'beauty salon',
-        'nail salon',
-        'pet grooming',
-        'fitness trainer',
-        'yoga studio'
+        # --- Medical / Health ---
+        'plastic surgeon', 'dermatologist', 'cosmetic dentist', 'orthodontist',
+        'medical spa', 'aesthetic clinic', 'weight loss clinic', 
+        'chiropractor', 'urgent care', 'orthopedic surgeon', 'eye doctor',
+        'physical therapy center', 'laser hair removal', 'dental implant center',
+
+        # --- Legal & Financial ---
+        'law firm', 'personal injury attorney', 'family law attorney',
+        'immigration lawyer', 'tax attorney', 'real estate attorney',
+        'CPA firm', 'accounting firm', 'financial advisor', 
+        'insurance agency', 'mortgage broker', 'wealth management firm',
+        'credit repair company', 'business loan broker', 'title company',
+
+        # --- Real Estate / Home Improvement (High-ticket) ---
+        'luxury real estate agent', 'real estate brokerage', 'home builder',
+        'kitchen remodeling', 'bathroom remodeling', 'custom home builder',
+        'interior designer', 'architectural firm', 'roofing contractor',
+        'solar energy company', 'landscaping design', 'pool construction',
+        'garage door installer', 'home automation company', 
+        'smart home installer', 'flooring contractor', 'epoxy flooring',
+        'HVAC contractor', 'water damage restoration', 'fencing contractor',
+
+        # --- Automotive / Transport ---
+        'auto dealership', 'exotic car dealership', 'auto body shop',
+        'auto detailing service', 'RV dealership', 'truck repair shop',
+        'auto glass repair', 'towing service', 'fleet management company',
+
+        # --- Education / Coaching / B2B ---
+        'business coach', 'marketing agency', 'digital marketing agency',
+        'SEO agency', 'web design company', 'AI automation agency',
+        'software development company', 'IT consulting', 'cybersecurity firm',
+        'data analytics company', 'staffing agency', 'recruitment firm',
+        'real estate investment company', 'property management company',
+
+        # --- Luxury / Lifestyle / Hospitality ---
+        'high-end restaurant', 'wedding venue', 'event planner', 
+        'luxury spa', 'boutique hotel', 'vacation rental company',
+        'yacht charter', 'private jet charter', 'luxury car rental',
+
+        # --- Industrial / Construction ---
+        'commercial construction', 'engineering firm', 'civil engineering',
+        'mechanical contractor', 'electrical contractor', 'plumbing contractor',
+        'land developer', 'commercial roofing company', 'warehouse builder',
+        'industrial automation company', 'security systems installer',
+        'fire protection contractor', 'commercial painter'
     ]
-    
-    locations = [
-        'Orlando FL',
-        'Winter Park FL',
-        'Kissimmee FL',
-        'Lake Nona FL',
-        'Altamonte Springs FL'
-    ]
+
     
     print("Starting lead generation...")
     print(f"Searching {len(queries)} business types across {len(locations)} locations\n")
