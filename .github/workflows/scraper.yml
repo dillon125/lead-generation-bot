@@ -32,7 +32,7 @@ jobs:
         python lead_scraper.py
     
     - name: Upload leads artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: leads-excel-file
