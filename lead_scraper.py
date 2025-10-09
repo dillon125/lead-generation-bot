@@ -8,6 +8,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
 from email import encoders
+import schedule
 
 class LeadGenerator:
     def __init__(self, api_key):
@@ -35,7 +36,7 @@ class LeadGenerator:
         url = f"{self.base_url}/details/json"
         params = {
             'place_id': place_id,
-            'fields': 'name,formatted_address,formatted_phone_number,website,rating,user_ratings_total,opening_hours,types',
+            'fields': 'name,formatted_address,formatted_phone_number,website,rating,user_ratings_total,opening_hours,types,business_status',
             'key': self.api_key
         }
         
@@ -47,9 +48,19 @@ class LeadGenerator:
             print(f"Error getting details for {place_id}: {e}")
             return {}
     
+    def extract_email_from_text(self, text):
+        """Extract email from text using basic pattern matching"""
+        import re
+        if not text:
+            return None
+        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        matches = re.findall(email_pattern, text)
+        return matches[0] if matches else None
+    
     def generate_leads(self, queries, locations):
         """Generate leads from multiple queries and locations"""
         all_leads = []
+        seen_places = set()
         
         for location in locations:
             for query in queries:
@@ -58,16 +69,29 @@ class LeadGenerator:
                 
                 for result in results:
                     place_id = result.get('place_id')
+                    
+                    # Skip duplicates
+                    if place_id in seen_places:
+                        continue
+                    seen_places.add(place_id)
+                    
                     details = self.get_place_details(place_id)
                     
                     # Only include businesses WITHOUT websites
                     if 'website' not in details or not details.get('website'):
+                        # Try to extract email from name or address (limited success)
+                        email = self.extract_email_from_text(result.get('name', ''))
+                        if not email:
+                            email = self.extract_email_from_text(result.get('formatted_address', ''))
+                        
                         lead = {
                             'Business Name': result.get('name', 'N/A'),
                             'Address': result.get('formatted_address', 'N/A'),
                             'Phone': details.get('formatted_phone_number', 'N/A'),
+                            'Email': email if email else 'Not Found',
                             'Rating': result.get('rating', 'N/A'),
                             'Total Ratings': result.get('user_ratings_total', 0),
+                            'Business Status': details.get('business_status', 'N/A'),
                             'Types': ', '.join(result.get('types', [])),
                             'Location Searched': location,
                             'Query Used': query,
@@ -98,17 +122,17 @@ class LeadGenerator:
             msg = MIMEMultipart()
             msg['From'] = sender_email
             msg['To'] = recipient_email
-            msg['Subject'] = f'New Leads Report - {datetime.now().strftime("%Y-%m-%d")}'
+            msg['Subject'] = f'New Leads Report - {datetime.now().strftime("%Y-%m-%d %H:%M")}'
             
             body = f"""
-            New leads have been generated!
-            
-            Total leads found: {len(pd.read_excel(filename))}
-            Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-            
-            See attached Excel file for details.
-            
-            - Sphere Premier Solutions Lead Bot
+New leads have been generated!
+
+Total leads found: {len(pd.read_excel(filename))}
+Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+See attached Excel file for details.
+
+- Sphere Premier Solutions Lead Bot
             """
             
             msg.attach(MIMEText(body, 'plain'))
@@ -136,7 +160,12 @@ class LeadGenerator:
             return False
 
 
-def main():
+def run_lead_generation():
+    """Main function to run lead generation"""
+    print(f"\n{'='*60}")
+    print(f"🚀 Starting Lead Generation Run - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"{'='*60}\n")
+    
     # Get API key from environment variable
     API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY')
     
@@ -147,9 +176,9 @@ def main():
     # Initialize lead generator
     generator = LeadGenerator(API_KEY)
     
-        
+    # Expanded queries with high-value business types
     queries = [
-        # --- Home & Property Services ---
+        # Home & Property Services
         'barber shop', 'hair salon', 'beauty salon', 'nail salon', 'spa', 
         'plumber', 'electrician', 'hvac contractor', 'air conditioning service',
         'roofing contractor', 'landscaping service', 'lawn care', 'tree service',
@@ -161,16 +190,47 @@ def main():
         'appliance repair', 'locksmith', 'home cleaning service',
         'interior designer', 'real estate agent', 'property management',
         'mortgage broker', 'home inspector', 'contractor supply store',
-
-        # --- Auto & Transport ---
+        
+        # Auto & Transport
         'auto repair shop', 'auto detailing', 'car wash', 'tire shop',
         'tow truck service', 'auto glass repair', 'transmission shop',
         'car dealership', 'body shop', 'mobile mechanic', 'window tinting',
-
-
-
+        
+        # Health & Wellness
+        'dental office', 'dentist', 'chiropractor', 'physical therapy',
+        'massage therapy', 'yoga studio', 'fitness center', 'personal trainer',
+        'medical spa', 'weight loss clinic', 'acupuncture',
+        
+        # Professional Services
+        'insurance agent', 'tax preparation', 'accounting services',
+        'financial advisor', 'lawyer', 'attorney', 'notary public',
+        'business consulting', 'marketing agency', 'printing service',
+        
+        # Retail & Food
+        'pet grooming', 'pet store', 'bakery', 'cafe', 'restaurant',
+        'catering service', 'food truck', 'grocery store', 'liquor store',
+        'convenience store', 'clothing boutique', 'jewelry store'
+    ]
     
-    print("Starting lead generation...")
+    # Expanded Florida locations (covers Central FL thoroughly)
+    locations = [
+        # Greater Orlando Area
+        'Orlando FL', 'Winter Park FL', 'Kissimmee FL', 'Lake Nona FL', 
+        'Altamonte Springs FL', 'Sanford FL', 'Oviedo FL', 'Winter Garden FL',
+        'Maitland FL', 'Apopka FL', 'Clermont FL', 'Windermere FL',
+        'Lake Mary FL', 'Longwood FL', 'Casselberry FL', 'Winter Springs FL',
+        
+        # Surrounding Cities
+        'Davenport FL', 'Haines City FL', 'Poinciana FL', 'Celebration FL',
+        'St Cloud FL', 'Deltona FL', 'DeLand FL', 'Mount Dora FL',
+        'Leesburg FL', 'Eustis FL', 'The Villages FL',
+        
+        # Other Major FL Markets
+        'Tampa FL', 'St Petersburg FL', 'Clearwater FL', 'Lakeland FL',
+        'Melbourne FL', 'Cocoa Beach FL', 'Palm Bay FL', 'Vero Beach FL',
+        'Ocala FL', 'Gainesville FL', 'Daytona Beach FL', 'Port Orange FL'
+    ]
+    
     print(f"Searching {len(queries)} business types across {len(locations)} locations\n")
     
     # Generate leads
@@ -180,21 +240,40 @@ def main():
         # Save to Excel
         filename = generator.save_to_excel(leads)
         
-        # Optional: Send email (uncomment and configure if needed)
-        # sender_email = os.environ.get('EMAIL_ADDRESS')
-        # sender_password = os.environ.get('EMAIL_PASSWORD')
-        # recipient_email = 'your-email@example.com'
-        # 
-        # if sender_email and sender_password:
-        #     generator.send_email(filename, recipient_email, sender_email, sender_password)
+        # Optional: Send email (configure environment variables to enable)
+        sender_email = os.environ.get('EMAIL_ADDRESS')
+        sender_password = os.environ.get('EMAIL_PASSWORD')
+        recipient_email = os.environ.get('RECIPIENT_EMAIL', 'your-email@example.com')
+        
+        if sender_email and sender_password:
+            generator.send_email(filename, recipient_email, sender_email, sender_password)
+        else:
+            print("\n⚠️  Email not configured. Set EMAIL_ADDRESS and EMAIL_PASSWORD to enable auto-emailing.")
         
         print(f"\n✅ COMPLETE: Found {len(leads)} businesses without websites!")
     else:
         print("No leads found.")
+    
+    print(f"\n{'='*60}")
+    print(f"✅ Lead Generation Complete - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"{'='*60}\n")
 
 
-if __name__ == "__main__":
-    main()
+def main():
+    """Run immediately, then schedule every 3 hours"""
+    # Run immediately on startup
+    run_lead_generation()
+    
+    # Schedule to run every 3 hours
+    schedule.every(3).hours.do(run_lead_generation)
+    
+    print("\n🕒 Scheduler started - will run every 3 hours")
+    print("Press Ctrl+C to stop\n")
+    
+    # Keep the script running
+    while True:
+        schedule.run_pending()
+        time.sleep(60)  # Check every minute
 
 
 if __name__ == "__main__":
