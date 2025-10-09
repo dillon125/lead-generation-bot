@@ -1,6 +1,4 @@
-
-    
-    # Determine which city based on time (rotimport os
+import os
 import requests
 import pandas as pd
 from datetime import datetime
