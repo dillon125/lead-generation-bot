@@ -8,8 +8,6 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
 from email import encoders
-import schedule
-
 class LeadGenerator:
     def __init__(self, api_key):
         self.api_key = api_key
@@ -260,20 +258,12 @@ def run_lead_generation():
 
 
 def main():
-    """Run immediately, then schedule every 3 hours"""
-    # Run immediately on startup
+    """Run lead generation once"""
     run_lead_generation()
-    
-    # Schedule to run every 3 hours
-    schedule.every(3).hours.do(run_lead_generation)
-    
-    print("\n🕒 Scheduler started - will run every 3 hours")
-    print("Press Ctrl+C to stop\n")
-    
-    # Keep the script running
-    while True:
-        schedule.run_pending()
-        time.sleep(60)  # Check every minute
+
+
+if __name__ == "__main__":
+    main()
 
 
 if __name__ == "__main__":
