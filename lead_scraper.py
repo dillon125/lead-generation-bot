@@ -18,7 +18,7 @@ class LeadGenerator:
         """Search for businesses using Google Places API"""
         url = f"{self.base_url}/textsearch/json"
         params = {
-            'query': f"{query} in {location}",
+            'query': f'{query} in {location}',
             'key': self.api_key
         }
         
@@ -35,7 +35,7 @@ class LeadGenerator:
         url = f"{self.base_url}/details/json"
         params = {
             'place_id': place_id,
-            'fields': 'name,formatted_address,formatted_phone_number,website,rating,user_ratings_total',
+            'fields': 'name,formatted_address,formatted_phone_number,website,rating,user_ratings_total,opening_hours,types',
             'key': self.api_key
         }
         
@@ -47,80 +47,76 @@ class LeadGenerator:
             print(f"Error getting details for {place_id}: {e}")
             return {}
     
-    def generate_leads(self, city, industries, max_per_industry=20):
-        """Generate leads for businesses without websites"""
+    def generate_leads(self, queries, locations):
+        """Generate leads from multiple queries and locations"""
         all_leads = []
         
-        print(f"\n🔍 Searching {city}...")
-        
-        for industry in industries:
-            print(f"  📋 {industry}...")
-            businesses = self.search_businesses(industry, city)
-            
-            for biz in businesses[:max_per_industry]:
-                time.sleep(0.5)  # Rate limiting
+        for location in locations:
+            for query in queries:
+                print(f"Searching: {query} in {location}")
+                results = self.search_businesses(query, location)
                 
-                details = self.get_place_details(biz.get('place_id'))
+                for result in results:
+                    place_id = result.get('place_id')
+                    details = self.get_place_details(place_id)
+                    
+                    # Only include businesses WITHOUT websites
+                    if 'website' not in details or not details.get('website'):
+                        lead = {
+                            'Business Name': result.get('name', 'N/A'),
+                            'Address': result.get('formatted_address', 'N/A'),
+                            'Phone': details.get('formatted_phone_number', 'N/A'),
+                            'Rating': result.get('rating', 'N/A'),
+                            'Total Ratings': result.get('user_ratings_total', 0),
+                            'Types': ', '.join(result.get('types', [])),
+                            'Location Searched': location,
+                            'Query Used': query,
+                            'Has Website': 'No',
+                            'Place ID': place_id
+                        }
+                        all_leads.append(lead)
+                        print(f"  ✓ Found: {lead['Business Name']} (No website)")
                 
-                # Only add if NO website
-                if not details.get('website'):
-                    lead = {
-                        'Business Name': details.get('name', 'N/A'),
-                        'Phone': details.get('formatted_phone_number', 'N/A'),
-                        'Address': details.get('formatted_address', 'N/A'),
-                        'City': city,
-                        'Industry': industry,
-                        'Rating': details.get('rating', 'N/A'),
-                        'Reviews': details.get('user_ratings_total', 'N/A'),
-                        'Email Template': f"Hi! I noticed {details.get('name')} doesn't have a website. I help {industry} businesses get online. 15 min call?"
-                    }
-                    all_leads.append(lead)
-                    print(f"    ✅ {lead['Business Name']}")
+                time.sleep(1)  # Rate limiting
         
         return all_leads
     
-    def save_to_excel(self, leads, filename):
+    def save_to_excel(self, leads, filename=None):
         """Save leads to Excel file"""
-        if not leads:
-            print("⚠️  No leads found (all had websites)")
-            return None
+        if not filename:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f'leads_{timestamp}.xlsx'
         
         df = pd.DataFrame(leads)
-        df.to_excel(filename, index=False)
-        print(f"\n✅ Saved {len(leads)} leads to {filename}")
+        df.to_excel(filename, index=False, engine='openpyxl')
+        print(f"\n✓ Saved {len(leads)} leads to {filename}")
         return filename
     
-    def send_email(self, filename, recipient):
-        """Send Excel file via email"""
+    def send_email(self, filename, recipient_email, sender_email, sender_password):
+        """Send the Excel file via email"""
         try:
-            sender = os.environ.get('GMAIL_USER')
-            password = os.environ.get('GMAIL_APP_PASSWORD')
-            
-            if not sender or not password:
-                print("⚠️  Email credentials not configured")
-                return
-            
             msg = MIMEMultipart()
-            msg['From'] = sender
-            msg['To'] = recipient
-            msg['Subject'] = f"🎯 New Leads - {datetime.now().strftime('%B %d, %Y %I:%M %p')}"
+            msg['From'] = sender_email
+            msg['To'] = recipient_email
+            msg['Subject'] = f'New Leads Report - {datetime.now().strftime("%Y-%m-%d")}'
             
             body = f"""
-            New leads scraped and ready!
+            New leads have been generated!
             
-            File attached: {filename}
+            Total leads found: {len(pd.read_excel(filename))}
+            Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
             
-            Import directly into GoHighLevel and start calling! 📞
+            See attached Excel file for details.
             
-            - Lead Generation Bot 🤖
+            - Sphere Premier Solutions Lead Bot
             """
             
             msg.attach(MIMEText(body, 'plain'))
             
             # Attach Excel file
-            with open(filename, 'rb') as f:
+            with open(filename, 'rb') as attachment:
                 part = MIMEBase('application', 'octet-stream')
-                part.set_payload(f.read())
+                part.set_payload(attachment.read())
                 encoders.encode_base64(part)
                 part.add_header('Content-Disposition', f'attachment; filename={filename}')
                 msg.attach(part)
@@ -128,134 +124,86 @@ class LeadGenerator:
             # Send email
             server = smtplib.SMTP('smtp.gmail.com', 587)
             server.starttls()
-            server.login(sender, password)
+            server.login(sender_email, sender_password)
             server.send_message(msg)
             server.quit()
             
-            print(f"📧 Email sent to {recipient}")
+            print(f"✓ Email sent to {recipient_email}")
+            return True
             
         except Exception as e:
-            print(f"❌ Email error: {e}")
+            print(f"Error sending email: {e}")
+            return False
 
 
 def main():
-    # Configuration
+    # Get API key from environment variable
     API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY')
-    EMAIL = 'Michael@spherepremier.com'
     
-    # Top 50 US Cities (rotates every 3 hours)
-    CITIES = [
-        'Los Angeles, CA', 'New York, NY', 'Chicago, IL', 'Houston, TX',
-        'Phoenix, AZ', 'Philadelphia, PA', 'San Antonio, TX', 'San Diego, CA',
-        'Dallas, TX', 'Austin, TX', 'Jacksonville, FL', 'Fort Worth, TX',
-        'San Jose, CA', 'Charlotte, NC', 'Columbus, OH', 'Indianapolis, IN',
-        'San Francisco, CA', 'Seattle, WA', 'Denver, CO', 'Boston, MA',
-        'Nashville, TN', 'Detroit, MI', 'Portland, OR', 'Las Vegas, NV',
-        'Memphis, TN', 'Louisville, KY', 'Baltimore, MD', 'Milwaukee, WI',
-        'Albuquerque, NM', 'Tucson, AZ', 'Fresno, CA', 'Sacramento, CA',
-        'Mesa, AZ', 'Kansas City, MO', 'Atlanta, GA', 'Miami, FL',
-        'Raleigh, NC', 'Omaha, NE', 'Colorado Springs, CO', 'Virginia Beach, VA',
-        'Oakland, CA', 'Minneapolis, MN', 'Tulsa, OK', 'Tampa, FL',
-        'Arlington, TX', 'New Orleans, LA', 'Wichita, KS', 'Cleveland, OH',
-        'Bakersfield, CA', 'Orlando, FL'
-    ]
+    if not API_KEY:
+        print("ERROR: GOOGLE_MAPS_API_KEY environment variable not set!")
+        return
     
-    # MAXIMUM industries - 60+ categories
-    INDUSTRIES = [
-        # Beauty & Personal Care
+    # Initialize lead generator
+    generator = LeadGenerator(API_KEY)
+    
+    # Define search parameters
+    queries = [
+        'barber shop',
         'hair salon',
-        'barbershop',
-        'nail salon',
-        'spa',
-        'massage therapist',
-        'tattoo shop',
-        'beauty salon',
-        'tanning salon',
-        'eyelash extensions',
-        'med spa',
-        
-        # Health & Wellness
-        'gym',
-        'fitness studio',
-        'yoga studio',
-        'pilates studio',
-        'martial arts school',
-        'chiropractor',
-        'physical therapy',
-        'acupuncture',
-        'nutritionist',
-        'counseling',
-        
-        # Home Services
+        'dental office',
+        'dentist',
+        'real estate agent',
+        'insurance agent',
+        'tax preparation',
+        'accounting services',
+        'cleaning service',
+        'landscaping service',
         'plumber',
         'electrician',
-        'HVAC company',
-        'roofing company',
-        'painting contractor',
-        'landscaping company',
-        'lawn care service',
-        'tree service',
-        'pest control',
-        'cleaning service',
-        'carpet cleaning',
-        'window cleaning',
-        'handyman service',
-        'locksmith',
-        'garage door repair',
-        
-        # Automotive
+        'hvac contractor',
+        'roofing contractor',
         'auto repair shop',
-        'auto body shop',
-        'tire shop',
-        'car wash',
-        'oil change service',
-        'towing service',
-        'auto detailing',
-        
-        # Food & Beverage
-        'restaurant',
-        'cafe',
-        'bakery',
-        'juice bar',
-        'catering service',
-        
-        # Pet Services
-        'pet groomer',
-        'dog trainer',
-        'veterinarian',
-        'pet boarding',
-        
-        # Professional Services
-        'accounting firm',
-        'tax preparation',
-        'insurance agency',
-        'real estate agent',
-        'photography studio',
-        'event planner'
+        'beauty salon',
+        'nail salon',
+        'pet grooming',
+        'fitness trainer',
+        'yoga studio'
     ]
     
-    # Determine which city based on time (rotates every 3 hours)
-    hour = datetime.now().hour
-    city_index = (hour // 3) % len(CITIES)
-    current_city = CITIES[city_index]
+    locations = [
+        'Orlando FL',
+        'Winter Park FL',
+        'Kissimmee FL',
+        'Lake Nona FL',
+        'Altamonte Springs FL'
+    ]
     
-    print(f"🚀 Lead Generation Bot Starting...")
-    print(f"📍 Target City: {current_city}")
-    print(f"⏰ Time: {datetime.now().strftime('%I:%M %p')}")
-    print(f"🎯 Industries: {len(INDUSTRIES)} categories")
+    print("Starting lead generation...")
+    print(f"Searching {len(queries)} business types across {len(locations)} locations\n")
     
     # Generate leads
-    generator = LeadGenerator(API_KEY)
-    leads = generator.generate_leads(current_city, INDUSTRIES, max_per_industry=20)
+    leads = generator.generate_leads(queries, locations)
     
-    # Save and email
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M')
-    filename = f"leads_{current_city.replace(', ', '_').replace(' ', '_')}_{timestamp}.xlsx"
-    
-    if generator.save_to_excel(leads, filename):
-        generator.send_email(filename, EMAIL)
-    
-    print("\n✅ Done!")
+    if leads:
+        # Save to Excel
+        filename = generator.save_to_excel(leads)
+        
+        # Optional: Send email (uncomment and configure if needed)
+        # sender_email = os.environ.get('EMAIL_ADDRESS')
+        # sender_password = os.environ.get('EMAIL_PASSWORD')
+        # recipient_email = 'your-email@example.com'
+        # 
+        # if sender_email and sender_password:
+        #     generator.send_email(filename, recipient_email, sender_email, sender_password)
+        
+        print(f"\n✅ COMPLETE: Found {len(leads)} businesses without websites!")
+    else:
+        print("No leads found.")
+
+
+if __name__ == "__main__":
+    main()
 
 
 if __name__ == "__main__":
