@@ -147,7 +147,27 @@ def main():
     # Initialize lead generator
     generator = LeadGenerator(API_KEY)
     
-    # Define search parameters queries = [ 'barber shop', 'hair salon', 'dental office', 'dentist', 'real estate agent', 'insurance agent', 'tax preparation', 'accounting services', 'cleaning service', 'landscaping service', 'plumber', 'electrician', 'hvac contractor', 'roofing contractor', 'auto repair shop', 'beauty salon', 'nail salon', 'pet grooming', 'fitness trainer', 'yoga studio' ] locations = [ 'Orlando FL', 'Winter Park FL', 'Kissimmee FL', 'Lake Nona FL', 'Altamonte Springs FL' ]
+        
+    queries = [
+        # --- Home & Property Services ---
+        'barber shop', 'hair salon', 'beauty salon', 'nail salon', 'spa', 
+        'plumber', 'electrician', 'hvac contractor', 'air conditioning service',
+        'roofing contractor', 'landscaping service', 'lawn care', 'tree service',
+        'pest control', 'pool cleaning', 'fencing contractor', 'paver installer',
+        'garage door repair', 'flooring contractor', 'epoxy flooring', 
+        'home remodeling', 'handyman service', 'painting contractor', 
+        'pressure washing', 'window cleaning', 'solar panel installer',
+        'gutter cleaning', 'water damage restoration', 'junk removal', 
+        'appliance repair', 'locksmith', 'home cleaning service',
+        'interior designer', 'real estate agent', 'property management',
+        'mortgage broker', 'home inspector', 'contractor supply store',
+
+        # --- Auto & Transport ---
+        'auto repair shop', 'auto detailing', 'car wash', 'tire shop',
+        'tow truck service', 'auto glass repair', 'transmission shop',
+        'car dealership', 'body shop', 'mobile mechanic', 'window tinting',
+
+
 
     
     print("Starting lead generation...")
